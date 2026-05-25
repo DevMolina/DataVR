@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Recurse \"C:\\\\Users\\\\Admin\\\\Documents\\\\00 Testing\\\\Creación de Usuarios\")",
+      "Bash(Select-Object FullName, Extension, Length)",
+      "Bash(npm install *)",
+      "Bash(npx playwright *)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}
