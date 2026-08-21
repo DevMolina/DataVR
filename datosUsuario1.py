@@ -13,7 +13,7 @@ exp_reg_placa = r'^[a-zA-Z]{3}\d{3}|[a-zA-Z]{1}\d{4}|[a-zA-Z]{2}\d{4}|[a-zA-Z]{1
 
 
 class Persona:
-    def __init__(self, tipo, min_veh, max_veh):
+    def __init__(self, tipo, min_veh, max_veh, letra_inicial=None):
         self.tipo = tipo
         if self.tipo == "Natural":
             self.razon_social = (unidecode(fake.first_name()))
@@ -37,14 +37,18 @@ class Persona:
         self.email = fake.email(domain='yopmail.com')
         self.cel = "3" + fake.numerify(text="#########")
         self.tel_eme = ''
-        self.vehiculos = [Vehiculo() for _ in range(random.randint(min_veh, max_veh))]  # Crea entre 1 y 3 vehículos para cada persona
+        self.vehiculos = [Vehiculo(letra_inicial) for _ in range(random.randint(min_veh, max_veh))]  # Crea entre 1 y 3 vehículos para cada persona
 
 class Vehiculo:
-    def __init__(self):
-        
+    def __init__(self, letra_inicial=None):
+        if letra_inicial is not None:
+            if not (isinstance(letra_inicial, str) and len(letra_inicial) == 1 and letra_inicial.isalpha()):
+                raise ValueError("letra_inicial debe ser una sola letra")
+            letra_inicial = letra_inicial.upper()
+
         while True:
             placa_temp = fake.license_plate()
             self.categoria = fake.random_int(min=1, max=7)
-            if re.match(exp_reg_placa, placa_temp):
+            if re.match(exp_reg_placa, placa_temp) and (letra_inicial is None or placa_temp[0].upper() == letra_inicial):
                 self.placa = placa_temp
                 break

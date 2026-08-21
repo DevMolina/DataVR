@@ -34,12 +34,23 @@ export interface RegistroUsuario {
 
 // ---- Helpers de generación ----
 
-function generarPlaca(): string {
+function generarPlaca(letraInicial?: string | null): string {
   // Genera siempre formato ABC123 (el más común en Colombia) que cumple el regex
+  let primera: string;
+  if (letraInicial) {
+    if (!/^[A-Za-z]$/.test(letraInicial)) {
+      throw new Error('LETRA_INICIAL_PLACA debe ser una sola letra');
+    }
+    primera = letraInicial.toUpperCase();
+  } else {
+    primera = faker.string.alpha({ length: 1, casing: 'upper' });
+  }
+
   let placa: string;
   do {
     placa =
-      faker.string.alpha({ length: 3, casing: 'upper' }) +
+      primera +
+      faker.string.alpha({ length: 2, casing: 'upper' }) +
       faker.string.numeric({ length: 3 });
   } while (!PLATE_REGEX.test(placa));
   return placa;
@@ -97,7 +108,7 @@ function generarPersonaNatural(epc: string): RegistroUsuario {
     personType: 1,
     phone: generarTelefono(),
     validEmail: email,
-    plate: generarPlaca(),
+    plate: generarPlaca(CONFIG.LETRA_INICIAL_PLACA),
     category: faker.number.int({ min: 1, max: 7 }),
     epc,
   };
@@ -136,7 +147,7 @@ function generarPersonaJuridica(epc: string): RegistroUsuario {
     personType: 2,
     phone: generarTelefono(),
     validEmail: email,
-    plate: generarPlaca(),
+    plate: generarPlaca(CONFIG.LETRA_INICIAL_PLACA),
     category: faker.number.int({ min: 1, max: 7 }),
     epc,
   };

@@ -1,21 +1,22 @@
 import random
 from datosUsuario1 import Persona
 
-def generar_registros(cantidad_natural, cantidad_juridico, cantidad_minima_vehiculos, cantidad_maxima_vehiculos):
+def generar_registros(cantidad_natural, cantidad_juridico, cantidad_minima_vehiculos, cantidad_maxima_vehiculos, letra_inicial_placa=None):
     """
     Genera una lista de diccionarios con datos de personas y vehículos.
-    
+
     Args:
         cantidad_natural (int): Número de personas naturales a generar.
         cantidad_juridico (int): Número de personas jurídicas a generar.
         cantidad_minima_vehiculos (int): Mínimo de vehículos por usuario.
         cantidad_maxima_vehiculos (int): Máximo de vehículos por usuario.
-        
+        letra_inicial_placa (str, optional): Si se indica, todas las placas generadas comenzarán con esta letra.
+
     Returns:
         list: Lista de diccionarios con los datos generados.
     """
-    personas = ([Persona("Natural", cantidad_minima_vehiculos, cantidad_maxima_vehiculos) for _ in range(cantidad_natural)] +
-                [Persona("Juridico", cantidad_minima_vehiculos, cantidad_maxima_vehiculos) for _ in range(cantidad_juridico)])
+    personas = ([Persona("Natural", cantidad_minima_vehiculos, cantidad_maxima_vehiculos, letra_inicial_placa) for _ in range(cantidad_natural)] +
+                [Persona("Juridico", cantidad_minima_vehiculos, cantidad_maxima_vehiculos, letra_inicial_placa) for _ in range(cantidad_juridico)])
     
     random.shuffle(personas)
 

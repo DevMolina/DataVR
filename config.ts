@@ -1,11 +1,14 @@
 export const CONFIG = {
   // --- Cantidad de usuarios a generar ---
-  TOTAL_NATURAL: 25,   // Personas naturales (CC)
-  TOTAL_JURIDICO: 25,   // Personas jurídicas (NIT)
+  TOTAL_NATURAL: 5,   // Personas naturales (CC)
+  TOTAL_JURIDICO: 5,   // Personas jurídicas (NIT)
 
   // --- Vehículos por usuario ---
   MIN_VEHICULOS: 1,
   MAX_VEHICULOS: 1,    // 1:1 usuario-vehículo por defecto
+
+  // --- Letra inicial de la placa (null = totalmente aleatoria) ---
+  LETRA_INICIAL_PLACA: null as string | null,
 
   // --- Campos fijos del API ---
   ADVISOR_ID: '1049625159',
