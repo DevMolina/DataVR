@@ -29,12 +29,13 @@ const registros: RegistroUsuario[] = generarRegistros(epcs);
 console.log(`\n[INICIO] Registros a crear: ${registros.length}`);
 console.log(`[INICIO] EPCs disponibles : ${epcs.length}`);
 
-// ---- Contadores globales para el resumen final ----
-let exitosos = 0;   // HTTP 200: registro + enrolamiento OK
-let parciales = 0;  // HTTP 205: registro OK, enrolamiento FALLIDO
-let fallidos = 0;
-
 const MAX_INTENTOS_PLACA = 50;
+
+function etiquetaResultado(status: number): string {
+  if (status === 200) return '✅ Exitoso';
+  if (status === 205) return '⚠️ Parcial (enrolamiento fallido)';
+  return `❌ Fallido (HTTP ${status})`;
+}
 
 // Regenera la placa del registro mientras ya exista en la base de datos Oracle.
 async function asegurarPlacaUnica(registro: RegistroUsuario, testInfo: { attach: (name: string, opts: { contentType: string; body: Buffer }) => Promise<void> }): Promise<void> {
@@ -74,6 +75,7 @@ for (const [index, registro] of registros.entries()) {
     const responseBody = await response.json().catch(() => ({}));
     const responseText = JSON.stringify(responseBody, null, 2);
     const status = response.status();
+    const resultado = etiquetaResultado(status);
 
     // ── Adjuntos visibles en el reporte HTML ──
     await testInfo.attach('Request', {
@@ -85,23 +87,41 @@ for (const [index, registro] of registros.entries()) {
       body: Buffer.from(responseText),
     });
 
+    // Fila de datos para el resumen Markdown final (leída por reporters/resumen-reporter.ts)
+    await testInfo.attach('ResumenFila', {
+      contentType: 'application/json',
+      body: Buffer.from(JSON.stringify({
+        index,
+        tipoDoc: registro.documentType,
+        documento: registro.identifier,
+        nombre: registro.firstName,
+        apellido: registro.lastName,
+        representante: registro.legalRepresentativeName ?? '',
+        email: registro.email,
+        telefono: registro.phone,
+        departamento: registro.department,
+        municipio: registro.locationId,
+        placa: registro.plate,
+        categoria: registro.category,
+        epc: registro.epc,
+        http: status,
+        resultado,
+      })),
+    });
+
+    // ── Anotación visible junto al título en el listado del reporte ──
+    testInfo.annotations.push({ type: 'Resultado', description: resultado });
+
     // ── Log en consola ──
     if (status === 205) {
-      parciales++;
-      testInfo.annotations.push({
-        type: 'enrolamiento-fallido',
-        description: `Usuario ${registro.identifier} registrado, pero el enrolamiento falló (HTTP 205)`,
-      });
       console.warn(`⚠ ${registro.identifier} | ${registro.email} | placa: ${registro.plate} | HTTP 205 (registro OK, enrolamiento FALLIDO)`);
       console.warn(`  REQUEST : ${requestBody}`);
       console.warn(`  RESPONSE: ${responseText}`);
     } else if (response.ok()) {
-      exitosos++;
       console.log(`✓ ${registro.identifier} | ${registro.email} | placa: ${registro.plate}`);
       console.log(`  REQUEST : ${requestBody}`);
       console.log(`  RESPONSE: ${responseText}`);
     } else {
-      fallidos++;
       console.error(`✗ ${registro.identifier} | HTTP ${status}`);
       console.error(`  REQUEST : ${requestBody}`);
       console.error(`  RESPONSE: ${responseText}`);
@@ -114,18 +134,10 @@ for (const [index, registro] of registros.entries()) {
   });
 }
 
-// ---- Test de resumen: siempre corre al final ----
-test.afterAll(() => {
-  const total = registros.length;
-  console.log('\n╔══════════════════════════════════════════╗');
-  console.log(`║            RESUMEN EJECUCIÓN              ║`);
-  console.log(`╠══════════════════════════════════════════╣`);
-  console.log(`║ Total                    : ${String(total).padEnd(15)}║`);
-  console.log(`║ Exitosos (200)           : ${String(exitosos).padEnd(15)}║`);
-  console.log(`║ Parciales (205, enrol. X): ${String(parciales).padEnd(15)}║`);
-  console.log(`║ Fallidos                 : ${String(fallidos).padEnd(15)}║`);
-  console.log('╚══════════════════════════════════════════╝\n');
-});
+// El resumen agregado (Exitosos/Parciales/Fallidos + tabla Markdown) lo genera
+// reporters/resumen-reporter.ts en onEnd(), ya que se ejecuta una sola vez en el
+// proceso principal con los resultados de TODOS los workers (aquí, con
+// `workers: 3`, un afterAll por worker solo vería un subconjunto de registros).
 
 // ---- Cierre del pool de conexiones Oracle ----
 test.afterAll(async () => {

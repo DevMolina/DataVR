@@ -7,6 +7,7 @@ export default defineConfig({
   reporter: [
     ['html', { outputFolder: 'playwright-report', open: 'never' }],
     ['list'],
+    ['./reporters/resumen-reporter.ts'],
   ],
   use: {
     baseURL: 'https://tstviarapida.co:8760',

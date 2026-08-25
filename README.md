@@ -117,7 +117,8 @@ npm run report
 
 El reporte HTML se genera automáticamente en `playwright-report/`. Cada usuario creado aparece como un test individual con:
 
-- **Estado**: verde (exitoso) o rojo (fallido)
+- **Estado**: verde (exitoso, incluye HTTP 205) o rojo (fallido)
+- **Anotación "Resultado"**: visible junto al título en el listado y en el detalle — `✅ Exitoso`, `⚠️ Parcial (enrolamiento fallido)` o `❌ Fallido (HTTP xxx)`. Nota: el título del test es fijo (nombre/documento) porque Playwright lo necesita para listar los tests antes de ejecutarlos; el resultado se muestra como anotación junto a él, no reemplazándolo.
 - **Adjunto Request**: JSON completo enviado al API
 - **Adjunto Response**: JSON de respuesta con el código HTTP
 
@@ -126,6 +127,10 @@ Para abrir el reporte manualmente:
 ```bash
 npm run report
 ```
+
+### Resumen en Markdown
+
+Al finalizar la ejecución, `reporters/resumen-reporter.ts` agrega los resultados de todos los `workers` y genera `reports/resumen-registros.md`: una tabla con los datos enviados en cada petición (documento, nombre, email, teléfono, placa, categoría, EPC, etc.), el código HTTP y el resultado (Exitoso / Parcial / Fallido), más los totales. Es una carpeta generada (`reports/` está en `.gitignore`), se sobrescribe en cada corrida.
 
 ---
 
