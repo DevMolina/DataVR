@@ -7,8 +7,10 @@ export const CONFIG = {
   MIN_VEHICULOS: 1,
   MAX_VEHICULOS: 1,    // 1:1 usuario-vehículo por defecto
 
-  // --- Letra inicial de la placa (null = totalmente aleatoria) ---
-  LETRA_INICIAL_PLACA: null as string | null,
+  // --- Rango de letras iniciales de la placa (null = cualquier letra A-Z) ---
+  // Ejemplo: { desde: 'A', hasta: 'D' } genera placas que empiezan por A, B, C o D.
+  // Para una letra fija, usar desde === hasta, ej. { desde: 'B', hasta: 'B' }.
+  RANGO_LETRA_INICIAL_PLACA: null as { desde: string; hasta: string } | null,
 
   // --- Campos fijos del API ---
   ADVISOR_ID: '1049625159',

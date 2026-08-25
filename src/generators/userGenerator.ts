@@ -32,16 +32,31 @@ export interface RegistroUsuario {
   epc: string;
 }
 
+export interface RangoLetraInicial {
+  desde: string;
+  hasta: string;
+}
+
 // ---- Helpers de generación ----
 
-function generarPlaca(letraInicial?: string | null): string {
+function letraAleatoriaEnRango(desde: string, hasta: string): string {
+  const min = desde.toUpperCase().charCodeAt(0);
+  const max = hasta.toUpperCase().charCodeAt(0);
+  return String.fromCharCode(faker.number.int({ min, max }));
+}
+
+export function generarPlaca(rangoLetraInicial?: RangoLetraInicial | null): string {
   // Genera siempre formato ABC123 (el más común en Colombia) que cumple el regex
   let primera: string;
-  if (letraInicial) {
-    if (!/^[A-Za-z]$/.test(letraInicial)) {
-      throw new Error('LETRA_INICIAL_PLACA debe ser una sola letra');
+  if (rangoLetraInicial) {
+    const { desde, hasta } = rangoLetraInicial;
+    if (!/^[A-Za-z]$/.test(desde) || !/^[A-Za-z]$/.test(hasta)) {
+      throw new Error('RANGO_LETRA_INICIAL_PLACA debe tener "desde" y "hasta" como una sola letra cada uno');
     }
-    primera = letraInicial.toUpperCase();
+    if (desde.toUpperCase().charCodeAt(0) > hasta.toUpperCase().charCodeAt(0)) {
+      throw new Error('RANGO_LETRA_INICIAL_PLACA: "desde" debe ser alfabéticamente menor o igual que "hasta"');
+    }
+    primera = letraAleatoriaEnRango(desde, hasta);
   } else {
     primera = faker.string.alpha({ length: 1, casing: 'upper' });
   }
@@ -108,7 +123,7 @@ function generarPersonaNatural(epc: string): RegistroUsuario {
     personType: 1,
     phone: generarTelefono(),
     validEmail: email,
-    plate: generarPlaca(CONFIG.LETRA_INICIAL_PLACA),
+    plate: generarPlaca(CONFIG.RANGO_LETRA_INICIAL_PLACA),
     category: faker.number.int({ min: 1, max: 7 }),
     epc,
   };
@@ -147,7 +162,7 @@ function generarPersonaJuridica(epc: string): RegistroUsuario {
     personType: 2,
     phone: generarTelefono(),
     validEmail: email,
-    plate: generarPlaca(CONFIG.LETRA_INICIAL_PLACA),
+    plate: generarPlaca(CONFIG.RANGO_LETRA_INICIAL_PLACA),
     category: faker.number.int({ min: 1, max: 7 }),
     epc,
   };

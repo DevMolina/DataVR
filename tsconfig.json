@@ -7,8 +7,7 @@
     "types": ["node"],
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "outDir": "./dist",
-    "baseUrl": "."
+    "outDir": "./dist"
   },
   "include": ["src/**/*", "tests/**/*", "*.ts"]
 }

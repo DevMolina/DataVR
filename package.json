@@ -9,9 +9,12 @@
   "devDependencies": {
     "@playwright/test": "^1.44.0",
     "@types/node": "^20.0.0",
+    "@types/oracledb": "^7.0.2",
     "typescript": "^5.4.0"
   },
   "dependencies": {
-    "@faker-js/faker": "^8.4.0"
+    "@faker-js/faker": "^8.4.0",
+    "dotenv": "^16.4.5",
+    "oracledb": "^6.5.1"
   }
 }

@@ -67,7 +67,29 @@ Si hay menos EPCs que usuarios, se reutilizan en ciclo. Si el archivo está vac�
 | `MIN_VEHICULOS` | Mínimo de vehículos por usuario              | `1`               |
 | `MAX_VEHICULOS` | Máximo de vehículos por usuario              | `1`               |
 
-### 5. Paralelismo
+### 5. Rango de letra inicial de la placa (`config.ts`)
+
+```typescript
+RANGO_LETRA_INICIAL_PLACA: { desde: 'A', hasta: 'D' },  // null = cualquier letra A-Z
+```
+
+Todas las placas generadas empezarán por una letra dentro de ese rango (inclusive). Para fijar una sola letra, usar `desde` igual a `hasta`, ej. `{ desde: 'B', hasta: 'B' }`.
+
+### 6. Validación de placas únicas contra Oracle
+
+Antes de cada creación se consulta la tabla `TAG` en Oracle; si la placa generada ya existe, se descarta y se genera una nueva (respetando el rango de letra configurado) hasta encontrar una libre.
+
+Copiar `.env.example` como `.env` y completar:
+
+```
+ORACLE_USER=usuario
+ORACLE_PASSWORD=clave
+ORACLE_CONNECT_STRING=host:puerto/service_name
+```
+
+> `.env` está en `.gitignore` — nunca se debe commitear con credenciales reales.
+
+### 7. Paralelismo
 
 Editar `playwright.config.ts`:
 
