@@ -49,7 +49,14 @@ const MAX_INTENTOS_FORMATO = 500;
 // ---- Helpers de generación ----
 
 function generarDesdeRegex(regex: RegExp): string {
-  return new RandExp(regex).gen();
+  const randexp = new RandExp(regex);
+  // randexp usa Math.random() por defecto, que NO respeta faker.seed(). Eso
+  // desincroniza el resto de las llamadas a faker entre el proceso que lista
+  // los tests y el worker que los ejecuta (títulos generados distinto en cada
+  // uno → "Test not found in the worker process"). Se enruta su aleatoriedad
+  // por el RNG sembrado de faker para que todo quede determinista.
+  randexp.randInt = (min, max) => faker.number.int({ min, max });
+  return randexp.gen();
 }
 
 function primeraLetraEnRango(placa: string, { desde, hasta }: RangoLetraInicial): boolean {
