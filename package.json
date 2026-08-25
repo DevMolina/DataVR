@@ -4,17 +4,20 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "report": "playwright show-report"
+    "report": "playwright show-report",
+    "verificar-placa": "ts-node scripts/verificar-placa.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
     "@types/node": "^20.0.0",
     "@types/oracledb": "^7.0.2",
+    "ts-node": "^10.9.2",
     "typescript": "^5.4.0"
   },
   "dependencies": {
     "@faker-js/faker": "^8.4.0",
     "dotenv": "^16.4.5",
-    "oracledb": "^6.5.1"
+    "oracledb": "^6.5.1",
+    "randexp": "^0.5.3"
   }
 }

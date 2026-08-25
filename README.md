@@ -67,17 +67,28 @@ Si hay menos EPCs que usuarios, se reutilizan en ciclo. Si el archivo está vac�
 | `MIN_VEHICULOS` | Mínimo de vehículos por usuario              | `1`               |
 | `MAX_VEHICULOS` | Máximo de vehículos por usuario              | `1`               |
 
-### 5. Rango de letra inicial de la placa (`config.ts`)
+### 5. Formato de placa, como expresión regular (`config.ts`)
+
+```typescript
+FORMATOS_PLACA: [
+  /^[A-Z]{3}[0-9]{3}$/,   // 3 letras + 3 números, ej. ABC123
+  /^[A-Z][0-9]{5}$/,      // 1 letra + 5 números, ej. A12345
+],
+```
+
+En cada placa se elige al azar uno de los regex de la lista y se genera un string aleatorio que lo cumple (usando [`randexp`](https://www.npmjs.com/package/randexp)). Para forzar un único formato, dejar un solo elemento en el arreglo. Se pueden agregar otros formatos (ej. `/^[A-Z]{2}[0-9]{4}$/`) siempre que el regex describa la placa completa.
+
+### 6. Rango de letra inicial de la placa (`config.ts`)
 
 ```typescript
 RANGO_LETRA_INICIAL_PLACA: { desde: 'A', hasta: 'D' },  // null = cualquier letra A-Z
 ```
 
-Todas las placas generadas empezarán por una letra dentro de ese rango (inclusive). Para fijar una sola letra, usar `desde` igual a `hasta`, ej. `{ desde: 'B', hasta: 'B' }`.
+Todas las placas generadas empezarán por una letra dentro de ese rango (inclusive), sin importar cuál de los `FORMATOS_PLACA` se haya elegido. Para fijar una sola letra, usar `desde` igual a `hasta`, ej. `{ desde: 'B', hasta: 'B' }`. Si el rango es incompatible con todos los formatos configurados (ej. un formato que no admite letra en la primera posición), se lanza un error claro en vez de colgarse.
 
-### 6. Validación de placas únicas contra Oracle
+### 7. Validación de placas únicas contra Oracle
 
-Antes de cada creación se consulta la tabla `TAG` en Oracle; si la placa generada ya existe, se descarta y se genera una nueva (respetando el rango de letra configurado) hasta encontrar una libre.
+Antes de cada creación se consulta la tabla `TAG` en Oracle; si la placa generada ya existe, se descarta y se genera una nueva (respetando formato y rango de letra configurados) hasta encontrar una libre. Puedes verificar manualmente una placa puntual con `npm run verificar-placa -- ABC123`.
 
 Copiar `.env.example` como `.env` y completar:
 
@@ -89,7 +100,7 @@ ORACLE_CONNECT_STRING=host:puerto/service_name
 
 > `.env` está en `.gitignore` — nunca se debe commitear con credenciales reales.
 
-### 7. Paralelismo
+### 8. Paralelismo
 
 Editar `playwright.config.ts`:
 
@@ -130,7 +141,7 @@ npm run report
 
 ### Resumen en Markdown
 
-Al finalizar la ejecución, `reporters/resumen-reporter.ts` agrega los resultados de todos los `workers` y genera `reports/resumen-registros.md`: una tabla con los datos enviados en cada petición (documento, nombre, email, teléfono, placa, categoría, EPC, etc.), el código HTTP y el resultado (Exitoso / Parcial / Fallido), más los totales. Es una carpeta generada (`reports/` está en `.gitignore`), se sobrescribe en cada corrida.
+Al finalizar la ejecución, `reporters/resumen-reporter.ts` agrega los resultados de todos los `workers` y genera `reports/resumen-registros_<fecha>_<hora>.md` (ej. `resumen-registros_2026-08-25_15-39-25.md`): una tabla con los datos enviados en cada petición (documento, nombre, email, teléfono, placa, categoría, EPC, etc.), el código HTTP y el resultado (Exitoso / Parcial / Fallido), más los totales. Cada corrida de `npm test` genera un archivo nuevo, no se sobrescribe el de corridas anteriores. Es una carpeta generada (`reports/` está en `.gitignore`).
 
 ---
 

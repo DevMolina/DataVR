@@ -26,12 +26,20 @@ async function getPool(): Promise<Pool> {
 }
 
 // Verifica si ya existe una placa registrada en la tabla TAG.
+//
+// Se usa TRIM + UPPER en vez de un LIKE directo con el bind porque
+// VEHICLELICENCEPLATENUMBER puede ser un CHAR(n) de Oracle: esas columnas se
+// rellenan con espacios hasta completar su ancho fijo, y un bind VARCHAR2 sin
+// comodines nunca calza contra el valor con relleno, por lo que un LIKE simple
+// deja de detectar duplicados que sí existen (falsos negativos silenciosos).
 export async function placaExiste(placa: string): Promise<boolean> {
   const p = await getPool();
   const connection = await p.getConnection();
   try {
     const result = await connection.execute<{ VEHICLELICENCEPLATENUMBER: string }>(
-      `SELECT t.VEHICLELICENCEPLATENUMBER FROM TAG t WHERE t.VEHICLELICENCEPLATENUMBER LIKE :placa`,
+      `SELECT t.VEHICLELICENCEPLATENUMBER
+         FROM TAG t
+        WHERE UPPER(TRIM(t.VEHICLELICENCEPLATENUMBER)) = UPPER(:placa)`,
       { placa },
       { maxRows: 1 }
     );

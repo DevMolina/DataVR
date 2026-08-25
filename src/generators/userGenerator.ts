@@ -1,10 +1,8 @@
 import { faker } from '@faker-js/faker';
+import RandExp from 'randexp';
 import { calcularDvDian } from '../utils/dian';
 import { munDep } from '../data/locations';
 import { CONFIG } from '../../config';
-
-// Regex portada del script Python original (formato colombiano más común: ABC123)
-const PLATE_REGEX = /^([A-Za-z]{3}\d{3}|[A-Za-z]\d{4}|[A-Za-z]{2}\d{4}|[A-Za-z]\d{5}|[A-Za-z]{2}\d{5}|[A-Za-z0-9]{7})$/;
 
 export interface RegistroUsuario {
   address: string;
@@ -37,17 +35,35 @@ export interface RangoLetraInicial {
   hasta: string;
 }
 
+// Cada formato es una expresión regular que describe una forma válida de placa.
+// Por defecto: 3 letras + 3 números (ABC123) y 1 letra + 5 números (A12345).
+export type FormatoPlaca = RegExp;
+
+const FORMATOS_POR_DEFECTO: FormatoPlaca[] = [
+  /^[A-Z]{3}[0-9]{3}$/,
+  /^[A-Z][0-9]{5}$/,
+];
+
+const MAX_INTENTOS_FORMATO = 500;
+
 // ---- Helpers de generación ----
 
-function letraAleatoriaEnRango(desde: string, hasta: string): string {
-  const min = desde.toUpperCase().charCodeAt(0);
-  const max = hasta.toUpperCase().charCodeAt(0);
-  return String.fromCharCode(faker.number.int({ min, max }));
+function generarDesdeRegex(regex: RegExp): string {
+  return new RandExp(regex).gen();
 }
 
-export function generarPlaca(rangoLetraInicial?: RangoLetraInicial | null): string {
-  // Genera siempre formato ABC123 (el más común en Colombia) que cumple el regex
-  let primera: string;
+function primeraLetraEnRango(placa: string, { desde, hasta }: RangoLetraInicial): boolean {
+  const codigo = placa.charAt(0).toUpperCase().charCodeAt(0);
+  return codigo >= desde.toUpperCase().charCodeAt(0) && codigo <= hasta.toUpperCase().charCodeAt(0);
+}
+
+export function generarPlaca(
+  rangoLetraInicial?: RangoLetraInicial | null,
+  formatos: FormatoPlaca[] = FORMATOS_POR_DEFECTO
+): string {
+  if (formatos.length === 0) {
+    throw new Error('FORMATOS_PLACA no puede ser una lista vacía');
+  }
   if (rangoLetraInicial) {
     const { desde, hasta } = rangoLetraInicial;
     if (!/^[A-Za-z]$/.test(desde) || !/^[A-Za-z]$/.test(hasta)) {
@@ -56,18 +72,22 @@ export function generarPlaca(rangoLetraInicial?: RangoLetraInicial | null): stri
     if (desde.toUpperCase().charCodeAt(0) > hasta.toUpperCase().charCodeAt(0)) {
       throw new Error('RANGO_LETRA_INICIAL_PLACA: "desde" debe ser alfabéticamente menor o igual que "hasta"');
     }
-    primera = letraAleatoriaEnRango(desde, hasta);
-  } else {
-    primera = faker.string.alpha({ length: 1, casing: 'upper' });
   }
 
   let placa: string;
+  let intentos = 0;
   do {
-    placa =
-      primera +
-      faker.string.alpha({ length: 2, casing: 'upper' }) +
-      faker.string.numeric({ length: 3 });
-  } while (!PLATE_REGEX.test(placa));
+    intentos++;
+    if (intentos > MAX_INTENTOS_FORMATO) {
+      throw new Error(
+        `No fue posible generar una placa que cumpla FORMATOS_PLACA y RANGO_LETRA_INICIAL_PLACA tras ${MAX_INTENTOS_FORMATO} intentos. ` +
+        'Verifica que al menos un formato admita una letra en la primera posición dentro del rango configurado.'
+      );
+    }
+    const formato = faker.helpers.arrayElement(formatos);
+    placa = generarDesdeRegex(formato);
+  } while (rangoLetraInicial && !primeraLetraEnRango(placa, rangoLetraInicial));
+
   return placa;
 }
 
@@ -123,7 +143,7 @@ function generarPersonaNatural(epc: string): RegistroUsuario {
     personType: 1,
     phone: generarTelefono(),
     validEmail: email,
-    plate: generarPlaca(CONFIG.RANGO_LETRA_INICIAL_PLACA),
+    plate: generarPlaca(CONFIG.RANGO_LETRA_INICIAL_PLACA, CONFIG.FORMATOS_PLACA),
     category: faker.number.int({ min: 1, max: 7 }),
     epc,
   };
@@ -162,7 +182,7 @@ function generarPersonaJuridica(epc: string): RegistroUsuario {
     personType: 2,
     phone: generarTelefono(),
     validEmail: email,
-    plate: generarPlaca(CONFIG.RANGO_LETRA_INICIAL_PLACA),
+    plate: generarPlaca(CONFIG.RANGO_LETRA_INICIAL_PLACA, CONFIG.FORMATOS_PLACA),
     category: faker.number.int({ min: 1, max: 7 }),
     epc,
   };

@@ -48,7 +48,7 @@ async function asegurarPlacaUnica(registro: RegistroUsuario, testInfo: { attach:
       );
     }
     const placaAnterior = registro.plate;
-    registro.plate = generarPlaca(CONFIG.RANGO_LETRA_INICIAL_PLACA);
+    registro.plate = generarPlaca(CONFIG.RANGO_LETRA_INICIAL_PLACA, CONFIG.FORMATOS_PLACA);
     console.warn(`↻ Placa duplicada en BD (${placaAnterior}), regenerando → ${registro.plate}`);
   }
   if (intentos > 0) {
@@ -110,7 +110,10 @@ for (const [index, registro] of registros.entries()) {
     });
 
     // ── Anotación visible junto al título en el listado del reporte ──
-    testInfo.annotations.push({ type: 'Resultado', description: resultado });
+    // El texto del resultado va en "type" (no solo en "description") porque el
+    // reporte HTML de Playwright muestra el "type" como badge directamente en la
+    // fila de la lista; la "description" solo se ve al entrar al detalle.
+    testInfo.annotations.push({ type: resultado, description: `HTTP ${status} — ${registro.identifier}` });
 
     // ── Log en consola ──
     if (status === 205) {
