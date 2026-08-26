@@ -49,6 +49,45 @@ export async function placaExiste(placa: string): Promise<boolean> {
   }
 }
 
+// Verifica si ya existe un contacto con ese número de identificación / NIT+DV
+// en la tabla CONTACTS (campo USER_ID). Mismo motivo de TRIM+UPPER que en
+// placaExiste: la columna puede venir rellenada con espacios (CHAR(n)).
+export async function identificadorExiste(identifier: string): Promise<boolean> {
+  const p = await getPool();
+  const connection = await p.getConnection();
+  try {
+    const result = await connection.execute<{ USER_ID: string }>(
+      `SELECT c.USER_ID
+         FROM CONTACTS c
+        WHERE UPPER(TRIM(c.USER_ID)) = UPPER(:identifier)`,
+      { identifier },
+      { maxRows: 1 }
+    );
+    return (result.rows?.length ?? 0) > 0;
+  } finally {
+    await connection.close();
+  }
+}
+
+// Verifica si ya existe un contacto con ese correo en la tabla CONTACTS
+// (campo EMAIL).
+export async function emailExiste(email: string): Promise<boolean> {
+  const p = await getPool();
+  const connection = await p.getConnection();
+  try {
+    const result = await connection.execute<{ EMAIL: string }>(
+      `SELECT c.EMAIL
+         FROM CONTACTS c
+        WHERE UPPER(TRIM(c.EMAIL)) = UPPER(:email)`,
+      { email },
+      { maxRows: 1 }
+    );
+    return (result.rows?.length ?? 0) > 0;
+  } finally {
+    await connection.close();
+  }
+}
+
 export async function cerrarPoolOracle(): Promise<void> {
   if (pool) {
     await pool.close(10);

@@ -55,7 +55,7 @@ export default class ResumenReporter implements Reporter {
 
     const total = this.filas.length;
     const exitosos = this.filas.filter((f) => f.http === 200).length;
-    const parciales = this.filas.filter((f) => f.http === 205).length;
+    const parciales = this.filas.filter((f) => f.http === 204).length;
     const fallidos = total - exitosos - parciales;
 
     // ── Resumen de consola en formato tabla ──
@@ -63,7 +63,7 @@ export default class ResumenReporter implements Reporter {
     console.table({
       Total: total,
       'Exitosos (200)': exitosos,
-      'Parciales (205, enrolamiento fallido)': parciales,
+      'Parciales (204, enrolamiento fallido)': parciales,
       Fallidos: fallidos,
     });
     console.table(
@@ -92,7 +92,7 @@ export default class ResumenReporter implements Reporter {
       '',
       `- Total: ${total}`,
       `- Exitosos (200): ${exitosos}`,
-      `- Parciales (205, enrolamiento fallido): ${parciales}`,
+      `- Parciales (204, enrolamiento fallido): ${parciales}`,
       `- Fallidos: ${fallidos}`,
       '',
       `| ${encabezados.join(' | ')} |`,

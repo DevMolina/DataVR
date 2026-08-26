@@ -103,6 +103,36 @@ function generarDocumento(length: number): string {
   return primerDigito + faker.string.numeric({ length: length - 1 });
 }
 
+// ---- Generación de identificador / email por separado ----
+// Se exportan para poder regenerar solo el campo que resulte duplicado en
+// CONTACTS (ver asegurarContactoUnico en tests/crear-usuarios.spec.ts) sin
+// tener que descartar el resto del registro ya generado.
+
+export function generarIdentificadorNatural(): string {
+  return generarDocumento(10);
+}
+
+export function generarIdentificadorJuridico(): string {
+  const nit = generarDocumento(9);
+  const dv = calcularDvDian(nit);
+  return `${nit}${dv}`;
+}
+
+export function generarEmailNatural(firstName: string, lastName: string): string {
+  return faker.internet.email({
+    firstName: firstName.toLowerCase(),
+    lastName: lastName.toLowerCase(),
+    provider: 'yopmail.com',
+  });
+}
+
+export function generarEmailJuridico(razonSocial: string): string {
+  return faker.internet.email({
+    firstName: razonSocial.toLowerCase().replace(/\s+/g, '.').substring(0, 20),
+    provider: 'yopmail.com',
+  });
+}
+
 function generarTelefono(): string {
   return '3' + faker.string.numeric({ length: 9 });
 }
@@ -121,12 +151,8 @@ function elegirDepMun(): { dep: string; mun: string } {
 function generarPersonaNatural(epc: string): RegistroUsuario {
   const firstName = removerAcentos(faker.person.firstName());
   const lastName = removerAcentos(faker.person.lastName());
-  const identifier = generarDocumento(10);
-  const email = faker.internet.email({
-    firstName: firstName.toLowerCase(),
-    lastName: lastName.toLowerCase(),
-    provider: 'yopmail.com',
-  });
+  const identifier = generarIdentificadorNatural();
+  const email = generarEmailNatural(firstName, lastName);
   const { dep, mun } = elegirDepMun();
 
   return {
@@ -159,13 +185,8 @@ function generarPersonaNatural(epc: string): RegistroUsuario {
 function generarPersonaJuridica(epc: string): RegistroUsuario {
   const razonSocial = removerAcentos(faker.company.name()).replace(/,/g, ' ');
   const representante = removerAcentos(faker.person.fullName());
-  const nit = generarDocumento(9);
-  const dv = calcularDvDian(nit);
-  const identifier = `${nit}${dv}`;
-  const email = faker.internet.email({
-    firstName: razonSocial.toLowerCase().replace(/\s+/g, '.').substring(0, 20),
-    provider: 'yopmail.com',
-  });
+  const identifier = generarIdentificadorJuridico();
+  const email = generarEmailJuridico(razonSocial);
   const { dep, mun } = elegirDepMun();
 
   return {
