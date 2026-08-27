@@ -1,6 +1,9 @@
 # Creación Masiva de Usuarios — Playwright
 
-Proyecto de automatización para poblar la base de datos de pruebas mediante creación masiva de usuarios a través del API REST. Genera datos colombianos aleatorios (personas naturales y jurídicas) con validación del dígito de verificación DIAN.
+Proyecto con dos partes independientes sobre el mismo endpoint (`POST /settings-users/api/v1/usersCl`):
+
+- **`runner/`** — herramienta de creación masiva de usuarios/vehículos de prueba (personas naturales y jurídicas colombianas, con dígito de verificación DIAN). No es una suite de validación: es un runner que consume el endpoint para poblar datos. Su comportamiento es estable y no cambia al agregar casos de prueba nuevos.
+- **`tests/`** — casos de prueba reales del endpoint (formato, límites, positivos y negativos) que evalúan cómo responde el API ante distintos escenarios. Ver [Casos de prueba del endpoint](#casos-de-prueba-del-endpoint).
 
 ---
 
@@ -25,13 +28,13 @@ npm install
 
 ### 1. URL base del API
 
-Editar `playwright.config.ts`:
+Editar `playwright.use.shared.ts` (compartido por `playwright.config.ts`, para los casos de prueba en `tests/`, y `playwright.runner.config.ts`, para el runner en `runner/` — un solo lugar para cambiar la URL en ambos):
 
 ```typescript
-use: {
+export const usoCompartido: PlaywrightTestConfig['use'] = {
   baseURL: 'https://tstviarapida.co:8760',  // <- cambiar aquí
   ...
-}
+};
 ```
 
 ### 2. Cantidad de usuarios
@@ -107,7 +110,7 @@ ORACLE_CONNECT_STRING=host:puerto/service_name
 
 ### 8. Paralelismo
 
-Editar `playwright.config.ts`:
+Editar `playwright.config.ts` (casos de prueba) y/o `playwright.runner.config.ts` (runner de creación masiva):
 
 ```typescript
 workers: 3,  // número de peticiones simultáneas al API
@@ -120,12 +123,23 @@ workers: 3,  // número de peticiones simultáneas al API
 ## Ejecución
 
 ```bash
-# Correr todos los tests
+# Casos de prueba del endpoint (tests/): validaciones unitarias + límite + negativos
 npm test
 
-# Ver el reporte HTML después de la ejecución
-npm run report
+# Solo una de las tres suites de tests/
+npm run test:validaciones
+npm run test:positivos
+npm run test:negativos
+
+# Runner de creación masiva de datos de prueba (runner/) — acción explícita y separada
+npm run test:masivo
+
+# Ver el reporte HTML de la última corrida
+npm run report            # de npm test (tests/)
+npm run report:masivo     # de npm run test:masivo (runner/)
 ```
+
+`npm run test:masivo` requiere `.env` con credenciales Oracle (los casos de `tests/` usan Oracle solo en `casos-positivos/`, ya que `casos-negativos/` y `validaciones/` no tocan la base de datos).
 
 ---
 
@@ -167,7 +181,39 @@ Módulo separado de los generadores (`src/generators/`) y de las consultas a BD 
 
 Estas validaciones de formato son independientes de las de unicidad contra BD (`identificadorExiste` / `emailExiste` / `placaExiste` en `src/db/oracle.ts`): las primeras determinan si el dato *tiene forma válida*, las segundas si *ya existe* en `CONTACTS` o `TAG`.
 
-Los casos de prueba de estas validaciones viven en `tests/validaciones/` (tests unitarios, sin `request` fixture ni conexión a Oracle) — es el punto de partida para agregar más casos de prueba de validación a futuro.
+Los casos de prueba de estas validaciones viven en `tests/validaciones/` (tests unitarios, sin `request` fixture ni conexión a Oracle).
+
+---
+
+## Casos de prueba del endpoint
+
+`tests/casos-negativos/campos-invalidos.spec.ts` envía, por cada campo relevante del body, una variante inválida (ausente, vacía, formato incorrecto, fuera de rango o inconsistente con otro campo — ver `src/testing/mutaciones.ts` → `CASOS_NEGATIVOS`) y compara el HTTP real contra una **línea base medida**, no contra un contrato ideal.
+
+### Por qué "línea base" y no "HTTP esperado de validación"
+
+Al medir el comportamiento real del ambiente de pruebas se encontró que el API **casi no valida el body**:
+
+| Patrón observado | Proporción | Ejemplo |
+|---|---|---|
+| 400 (validación real) | 2/92 | `locationId` con letras |
+| 500 (el servidor cae — bug) | 16/92 | `documentType`, `email`, `firstName`, `identifier`, `personType` ausentes/vacíos en ciertas combinaciones |
+| 451 (código no estándar, solo en NIT) | 3/92 | `identifier` ausente/inválido/DV incorrecto |
+| 204 (se crea igual, "enrolamiento fallido") | ~65/92 | la mayoría: `address`, `country`, `password`, `phone`, `category` fuera de rango, etc. |
+| 200 (éxito total, sin validar nada) | 6/92 | `plate`, `category` y `epc` ausentes |
+
+Como no hay un contrato de validación real que afirmar, cada caso en `CASOS_NEGATIVOS` trae su propio `httpEsperado` (el valor medido) y, cuando ese valor es un 500, `bugConocido: true`. La suite compara contra esa línea base: un test en rojo significa que el comportamiento **cambió** respecto a lo medido (regresión de contrato a revisar), no que el API esté validando mal — eso ya se sabe y queda documentado, no oculto.
+
+Si el equipo del API corrige la validación de un campo, actualiza el `httpEsperado` correspondiente en `src/testing/mutaciones.ts` para que la suite refleje el nuevo comportamiento esperado.
+
+`tests/casos-positivos/campos-limite.spec.ts` complementa con valores límite/equivalencia que sí deben ser aceptados (`category` en 1 y 7, `optionalPhone` con un valor real en vez de `null`) — reutiliza los mismos helpers de unicidad contra Oracle que el runner (`src/testing/registroHelpers.ts`), porque estos casos sí crean registros reales.
+
+### Reporte
+
+Además del reporte HTML estándar de Playwright, `reporters/resumen-reporter.ts` genera `reports/casos-validacion_<fecha>.md`: una tabla con cada campo/caso, el HTTP de línea base, el HTTP real, si es un bug conocido y si coincidió con la línea base.
+
+### Extender la cobertura
+
+Para agregar un caso nuevo: añadir una entrada a `CASOS_NEGATIVOS` (o `CASOS_POSITIVOS_LIMITE`) en `src/testing/mutaciones.ts` con su `httpEsperado` — se recomienda correr `npm run test:negativos` una vez para medir el comportamiento real del campo antes de fijar ese valor, en vez de asumirlo.
 
 ---
 
@@ -190,15 +236,17 @@ Los casos de prueba de estas validaciones viven en `tests/validaciones/` (tests 
 ## Estructura del proyecto
 
 ```
-├── config.ts                    # Parámetros configurables
-├── playwright.config.ts         # URL base, headers, workers, reporter
+├── config.ts                    # Parámetros configurables del runner de creación masiva
+├── playwright.config.ts         # Config de tests/ (casos de prueba del endpoint)
+├── playwright.runner.config.ts  # Config de runner/ (creación masiva)
+├── playwright.use.shared.ts     # baseURL/headers compartidos por ambos configs
 ├── data/
 │   └── epc-list.txt            # Lista de EPCs (un EPC por línea)
 ├── scripts/
 │   ├── verificar-placa.ts      # Diagnóstico manual: placa en TAG
 │   └── verificar-contacto.ts   # Diagnóstico manual: identificador/email en CONTACTS
 ├── reporters/
-│   └── resumen-reporter.ts     # Resumen agregado + tabla Markdown al finalizar
+│   └── resumen-reporter.ts     # Resumen agregado + tablas Markdown al finalizar
 ├── src/
 │   ├── utils/
 │   │   └── dian.ts             # Algoritmo dígito de verificación DIAN
@@ -209,11 +257,20 @@ Los casos de prueba de estas validaciones viven en `tests/validaciones/` (tests 
 │   ├── validators/
 │   │   ├── identificador.ts    # Validación de FORMATO: cédula, NIT+DV
 │   │   └── email.ts            # Validación de FORMATO: email
+│   ├── testing/
+│   │   ├── httpCodes.ts        # Constantes/labels de códigos HTTP del endpoint
+│   │   ├── registroHelpers.ts  # Unicidad Oracle + validación de formato (runner y casos-positivos)
+│   │   └── mutaciones.ts       # Catálogo de casos negativos/positivos con su línea base HTTP
 │   └── generators/
 │       └── userGenerator.ts    # Generación de personas y vehículos
+├── runner/
+│   └── crear-usuarios.spec.ts  # Herramienta de creación masiva (npm run test:masivo)
 └── tests/
-    ├── crear-usuarios.spec.ts  # Suite principal (creación masiva vía API)
-    └── validaciones/           # Tests unitarios de src/validators/ (sin API ni Oracle)
-        ├── identificador.spec.ts
-        └── email.spec.ts
+    ├── validaciones/           # Tests unitarios de src/validators/ (sin API ni Oracle)
+    │   ├── identificador.spec.ts
+    │   └── email.spec.ts
+    ├── casos-negativos/
+    │   └── campos-invalidos.spec.ts   # Body inválido por campo vs. línea base medida
+    └── casos-positivos/
+        └── campos-limite.spec.ts      # Valores límite/equivalencia que deben aceptarse
 ```

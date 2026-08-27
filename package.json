@@ -4,7 +4,12 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
+    "test:masivo": "playwright test -c playwright.runner.config.ts",
+    "test:negativos": "playwright test tests/casos-negativos",
+    "test:positivos": "playwright test tests/casos-positivos",
+    "test:validaciones": "playwright test tests/validaciones",
     "report": "playwright show-report",
+    "report:masivo": "playwright show-report playwright-report-runner",
     "verificar-placa": "ts-node scripts/verificar-placa.ts",
     "verificar-contacto": "ts-node scripts/verificar-contacto.ts"
   },

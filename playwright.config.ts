@@ -1,5 +1,9 @@
 import { defineConfig } from '@playwright/test';
+import { usoCompartido } from './playwright.use.shared';
 
+// Casos de prueba reales del endpoint (formato, límites, positivos/negativos).
+// Para la herramienta de creación masiva de datos de prueba, ver
+// playwright.runner.config.ts (testDir: ./runner).
 export default defineConfig({
   testDir: './tests',
   timeout: 30000,
@@ -9,12 +13,5 @@ export default defineConfig({
     ['list'],
     ['./reporters/resumen-reporter.ts'],
   ],
-  use: {
-    baseURL: 'https://tstviarapida.co:8760',
-    ignoreHTTPSErrors: true,
-    extraHTTPHeaders: {
-      'captchakeystring': '',
-      'Content-Type': 'application/json',
-    },
-  },
+  use: usoCompartido,
 });

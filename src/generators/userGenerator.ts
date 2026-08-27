@@ -16,7 +16,7 @@ export interface RegistroUsuario {
   legalRepresentativeId: string | null;
   legalRepresentativeName: string | null;
   locationId: string;
-  optionalPhone: null;
+  optionalPhone: string | null;
   password: string;
   passwordConfirm: string;
   advisorId: string;
@@ -148,7 +148,7 @@ function elegirDepMun(): { dep: string; mun: string } {
   return { dep, mun };
 }
 
-function generarPersonaNatural(epc: string): RegistroUsuario {
+export function generarPersonaNatural(epc: string): RegistroUsuario {
   const firstName = removerAcentos(faker.person.firstName());
   const lastName = removerAcentos(faker.person.lastName());
   const identifier = generarIdentificadorNatural();
@@ -182,7 +182,7 @@ function generarPersonaNatural(epc: string): RegistroUsuario {
   };
 }
 
-function generarPersonaJuridica(epc: string): RegistroUsuario {
+export function generarPersonaJuridica(epc: string): RegistroUsuario {
   const razonSocial = removerAcentos(faker.company.name()).replace(/,/g, ' ');
   const representante = removerAcentos(faker.person.fullName());
   const identifier = generarIdentificadorJuridico();
