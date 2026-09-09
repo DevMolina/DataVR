@@ -11,19 +11,16 @@
 // tests/crear-usuarios.spec.ts.
 import { test, expect } from '@playwright/test';
 import { faker } from '@faker-js/faker';
-import * as fs from 'fs';
-import * as path from 'path';
 import { generarPersonaNatural, generarPersonaJuridica } from '../../src/generators/userGenerator';
 import { CASOS_POSITIVOS_LIMITE } from '../../src/testing/mutaciones';
 import { esResultadoAceptable, etiquetaResultado } from '../../src/testing/httpCodes';
 import { validarFormatoRegistro, asegurarPlacaUnica, asegurarContactoUnico, AttachFn } from '../../src/testing/registroHelpers';
 import { cerrarPoolOracle } from '../../src/db/oracle';
-import { CONFIG } from '../../config';
+import { leerEpcsCacheados } from '../../src/testing/epcCache';
 
-const epcPath = path.resolve(__dirname, '..', '..', CONFIG.EPC_FILE);
-const epcs: string[] = fs.existsSync(epcPath)
-  ? fs.readFileSync(epcPath, 'utf-8').split('\n').map((e) => e.trim()).filter(Boolean)
-  : [];
+// EPCs cacheados desde Oracle por el proyecto 'epc-setup' (ver
+// playwright.config.ts → dependencies), que corre antes que esta suite.
+const epcs: string[] = leerEpcsCacheados();
 
 for (const caso of CASOS_POSITIVOS_LIMITE) {
   const label = `[POS-LIMITE] ${caso.aplicaA} — ${caso.nombre}`;

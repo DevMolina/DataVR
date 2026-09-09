@@ -9,6 +9,7 @@ import { usoCompartido } from './playwright.use.shared';
 // siempre una acción explícita.
 export default defineConfig({
   testDir: './runner',
+  globalSetup: './runner/globalSetup.ts',
   timeout: 30000,
   workers: 3,
   reporter: [

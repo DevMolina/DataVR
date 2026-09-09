@@ -50,15 +50,24 @@ TOTAL_JURIDICO: 25,  // Personas jurídicas (NIT) — 9 dígitos + dígito de ve
 
 ### 3. EPCs
 
-Agregar un EPC por línea en `data/epc-list.txt`:
+Los EPCs ya **no** se mantienen a mano en un archivo: se toman en vivo de Oracle (`src/db/oracle.ts` → `obtenerEpcsDisponibles`), con esta consulta:
 
-```
-7706113149744687610079635
-7706113149744687610079636
-7706113149744687610079637
+```sql
+SELECT ttei.EPC_MINISTERIO
+  FROM OFFICEVR.TB_TAG_EPC_INVENTARIO ttei
+  LEFT JOIN OFFICEVR.TB_DEVICE td ON ttei.EPC_MINISTERIO = td.DEVICE_EPC
+ WHERE ttei.tid NOT IN (SELECT t.EQUIPMENTOBUID FROM officevr.tag t)
+ ORDER BY ttei.EPC_MINISTERIO DESC
 ```
 
-Si hay menos EPCs que usuarios, se reutilizan en ciclo. Si el archivo está vacío, el campo `epc` se envía como cadena vacía.
+Es decir, EPCs del inventario del ministerio que todavía no están asociados a ningún tag ya registrado. Si hay menos EPCs disponibles que usuarios, se reutilizan en ciclo (igual que antes); si Oracle no devuelve ninguno, el campo `epc` se envía como cadena vacía.
+
+Como esta consulta es asíncrona y las suites arman su lista de tests de forma síncrona al cargar el módulo (ver `### 7`), el valor se cachea en disco (`.cache/epcs.json`, en `.gitignore`) por un paso previo antes de que los specs lo lean:
+
+- `runner/` la refresca vía `globalSetup` (`runner/globalSetup.ts`) — corre siempre antes de `npm run test:masivo`.
+- `tests/casos-positivos/` la refresca vía el proyecto `epc-setup` de Playwright (`tests/_setup/epc.setup.ts`), del que depende (ver `playwright.config.ts` → `projects`). `tests/casos-negativos/` y `tests/validaciones/` no usan EPCs y no disparan este paso.
+
+Para revisar cuántos EPCs hay disponibles sin correr una suite completa: `npm run verificar-epcs`.
 
 ### 4. Otros parámetros (`config.ts`)
 
@@ -95,6 +104,8 @@ Antes de cada creación se valida, contra la base de datos, que los datos genera
 
 - **Placa**: se consulta la tabla `TAG` (campo `VEHICLELICENCEPLATENUMBER`); si la placa generada ya existe, se descarta y se genera una nueva (respetando formato y rango de letra configurados) hasta encontrar una libre. Verificación manual: `npm run verificar-placa -- ABC123`.
 - **Identificador y email**: se consulta la tabla `CONTACTS` (campos `USER_ID` y `EMAIL`); si el número de identificación / NIT+DV o el correo generados ya existen, se regenera solo el campo afectado (identificador o email, no todo el registro) hasta obtener valores libres. Verificación manual: `npm run verificar-contacto -- --id 1234567890` o `npm run verificar-contacto -- --email nombre@yopmail.com`.
+
+Oracle también es la fuente de los EPCs disponibles (ver `### 3`), aunque esa consulta no es de unicidad sino de disponibilidad.
 
 Adicionalmente, antes de enviar cualquier petición se valida el **formato** del identificador (dígitos, no inicia en 0, dígito de verificación DIAN correcto para NIT) y del email (`src/validators/`). Esto es una verificación defensiva: el generador ya produce datos con formato correcto, pero la validación explícita detecta regresiones sin depender de la respuesta del API.
 
@@ -237,14 +248,13 @@ Para agregar un caso nuevo: añadir una entrada a `CASOS_NEGATIVOS` (o `CASOS_PO
 
 ```
 ├── config.ts                    # Parámetros configurables del runner de creación masiva
-├── playwright.config.ts         # Config de tests/ (casos de prueba del endpoint)
-├── playwright.runner.config.ts  # Config de runner/ (creación masiva)
+├── playwright.config.ts         # Config de tests/ (projects: epc-setup, validaciones, casos-negativos, casos-positivos)
+├── playwright.runner.config.ts  # Config de runner/ (creación masiva) + globalSetup de EPCs
 ├── playwright.use.shared.ts     # baseURL/headers compartidos por ambos configs
-├── data/
-│   └── epc-list.txt            # Lista de EPCs (un EPC por línea)
 ├── scripts/
 │   ├── verificar-placa.ts      # Diagnóstico manual: placa en TAG
-│   └── verificar-contacto.ts   # Diagnóstico manual: identificador/email en CONTACTS
+│   ├── verificar-contacto.ts   # Diagnóstico manual: identificador/email en CONTACTS
+│   └── verificar-epcs.ts       # Diagnóstico manual: EPCs disponibles en Oracle
 ├── reporters/
 │   └── resumen-reporter.ts     # Resumen agregado + tablas Markdown al finalizar
 ├── src/
@@ -253,19 +263,23 @@ Para agregar un caso nuevo: añadir una entrada a `CASOS_NEGATIVOS` (o `CASOS_PO
 │   ├── data/
 │   │   └── locations.ts        # Catálogo departamentos/municipios Colombia
 │   ├── db/
-│   │   └── oracle.ts           # Consultas de UNICIDAD contra Oracle (TAG, CONTACTS)
+│   │   └── oracle.ts           # Unicidad (TAG, CONTACTS) + EPCs disponibles, todo contra Oracle
 │   ├── validators/
 │   │   ├── identificador.ts    # Validación de FORMATO: cédula, NIT+DV
 │   │   └── email.ts            # Validación de FORMATO: email
 │   ├── testing/
 │   │   ├── httpCodes.ts        # Constantes/labels de códigos HTTP del endpoint
 │   │   ├── registroHelpers.ts  # Unicidad Oracle + validación de formato (runner y casos-positivos)
-│   │   └── mutaciones.ts       # Catálogo de casos negativos/positivos con su línea base HTTP
+│   │   ├── mutaciones.ts       # Catálogo de casos negativos/positivos con su línea base HTTP
+│   │   └── epcCache.ts         # Caché en disco de EPCs (puente entre Oracle async y carga síncrona de specs)
 │   └── generators/
 │       └── userGenerator.ts    # Generación de personas y vehículos
 ├── runner/
-│   └── crear-usuarios.spec.ts  # Herramienta de creación masiva (npm run test:masivo)
+│   ├── crear-usuarios.spec.ts  # Herramienta de creación masiva (npm run test:masivo)
+│   └── globalSetup.ts          # Refresca la caché de EPCs antes de correr el runner
 └── tests/
+    ├── _setup/
+    │   └── epc.setup.ts         # Proyecto Playwright que refresca la caché de EPCs (solo si casos-positivos corre)
     ├── validaciones/           # Tests unitarios de src/validators/ (sin API ni Oracle)
     │   ├── identificador.spec.ts
     │   └── email.spec.ts

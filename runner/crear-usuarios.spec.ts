@@ -1,29 +1,18 @@
 import { test, expect } from '@playwright/test';
-import * as fs from 'fs';
-import * as path from 'path';
 import { faker } from '@faker-js/faker';
 import { generarRegistros, RegistroUsuario } from '../src/generators/userGenerator';
 import { cerrarPoolOracle } from '../src/db/oracle';
 import { HTTP_EXITOSO, HTTP_PARCIAL_ENROLAMIENTO_FALLIDO, esResultadoAceptable, etiquetaResultado } from '../src/testing/httpCodes';
 import { validarFormatoRegistro, asegurarPlacaUnica, asegurarContactoUnico, AttachFn } from '../src/testing/registroHelpers';
-import { CONFIG } from '../config';
+import { leerEpcsCacheados } from '../src/testing/epcCache';
 
 // Semilla fija: garantiza que faker genere los mismos datos en el proceso
 // de colección de tests y en el worker de ejecución (evita "Test not found").
 faker.seed(42);
 
-// ---- Lectura de EPCs ----
-const epcPath = path.resolve(__dirname, '..', CONFIG.EPC_FILE);
-const epcs: string[] = fs.existsSync(epcPath)
-  ? fs.readFileSync(epcPath, 'utf-8')
-      .split('\n')
-      .map((e) => e.trim())
-      .filter(Boolean)
-  : [];
-
-if (epcs.length === 0) {
-  console.warn('[ADVERTENCIA] No se encontraron EPCs en', epcPath);
-}
+// ---- EPCs: se toman de Oracle, cacheados por globalSetup.ts antes de que
+// este módulo se cargue (ver src/testing/epcCache.ts) ----
+const epcs: string[] = leerEpcsCacheados();
 
 // ---- Generación de datos (en tiempo de carga del módulo) ----
 const registros: RegistroUsuario[] = generarRegistros(epcs);

@@ -27,9 +27,6 @@ export const CONFIG = {
   PASSWORD: 'Thoma$2025',
   FISCAL_RESPONS: '2',
 
-  // --- EPC: ruta al archivo con un EPC por línea ---
-  EPC_FILE: './data/epc-list.txt',
-
   // --- Código DIAN de Colombia (país) ---
   COLOMBIA_CODE: 169,
 };

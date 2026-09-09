@@ -11,7 +11,8 @@
     "report": "playwright show-report",
     "report:masivo": "playwright show-report playwright-report-runner",
     "verificar-placa": "ts-node scripts/verificar-placa.ts",
-    "verificar-contacto": "ts-node scripts/verificar-contacto.ts"
+    "verificar-contacto": "ts-node scripts/verificar-contacto.ts",
+    "verificar-epcs": "ts-node scripts/verificar-epcs.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
