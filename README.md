@@ -26,16 +26,9 @@ npm install
 
 ## Configuración
 
-### 1. URL base del API
+### 1. URL base del API (y demás parámetros por servidor)
 
-Editar `playwright.use.shared.ts` (compartido por `playwright.config.ts`, para los casos de prueba en `tests/`, y `playwright.runner.config.ts`, para el runner en `runner/` — un solo lugar para cambiar la URL en ambos):
-
-```typescript
-export const usoCompartido: PlaywrightTestConfig['use'] = {
-  baseURL: 'https://tstviarapida.co:8760',  // <- cambiar aquí
-  ...
-};
-```
+Este proyecto corre contra tres servidores (Vía Rápida 1/2/3), cada uno con su propia URL, credenciales Oracle y rango de letra de placa — ver [Múltiples servidores (Vía Rápida)](#múltiples-servidores-vía-rápida) para el detalle completo. La URL base ya no se edita directamente: cascada desde la variable de entorno `SERVIDOR` a través de `src/config/servidores.ts`.
 
 ### 2. Cantidad de usuarios
 
@@ -90,13 +83,15 @@ FORMATOS_PLACA: [
 
 En cada placa se elige al azar uno de los regex de la lista y se genera un string aleatorio que lo cumple (usando [`randexp`](https://www.npmjs.com/package/randexp)). Para forzar un único formato, dejar un solo elemento en el arreglo. Se pueden agregar otros formatos (ej. `/^[A-Z]{2}[0-9]{4}$/`) siempre que el regex describa la placa completa.
 
-### 6. Rango de letra inicial de la placa (`config.ts`)
+### 6. Rango de letra inicial de la placa
 
 ```typescript
 RANGO_LETRA_INICIAL_PLACA: { desde: 'A', hasta: 'D' },  // null = cualquier letra A-Z
 ```
 
 Todas las placas generadas empezarán por una letra dentro de ese rango (inclusive), sin importar cuál de los `FORMATOS_PLACA` se haya elegido. Para fijar una sola letra, usar `desde` igual a `hasta`, ej. `{ desde: 'B', hasta: 'B' }`. Si el rango es incompatible con todos los formatos configurados (ej. un formato que no admite letra en la primera posición), se lanza un error claro en vez de colgarse.
+
+Este valor en `config.ts` **cascada automáticamente desde el servidor activo** (`SERVIDOR`, ver la sección siguiente) — cada Vía Rápida tiene su propio rango asignado para que las placas generadas en un servidor nunca choquen con las de otro. Para forzar un rango distinto al de la tabla de servidores, sobreescribe `CONFIG.RANGO_LETRA_INICIAL_PLACA` directamente en `config.ts`.
 
 ### 7. Validación contra Oracle antes de enviar la petición
 
@@ -109,7 +104,7 @@ Oracle también es la fuente de los EPCs disponibles (ver `### 3`), aunque esa c
 
 Adicionalmente, antes de enviar cualquier petición se valida el **formato** del identificador (dígitos, no inicia en 0, dígito de verificación DIAN correcto para NIT) y del email (`src/validators/`). Esto es una verificación defensiva: el generador ya produce datos con formato correcto, pero la validación explícita detecta regresiones sin depender de la respuesta del API.
 
-Copiar `.env.example` como `.env` y completar:
+Las credenciales Oracle son **una por servidor** (ver [Múltiples servidores (Vía Rápida)](#múltiples-servidores-vía-rápida)): copiar `.env.vr1.example` → `.env.vr1`, `.env.vr2.example` → `.env.vr2` y `.env.vr3.example` → `.env.vr3`, y completar cada uno con las credenciales de su servidor:
 
 ```
 ORACLE_USER=usuario
@@ -117,7 +112,7 @@ ORACLE_PASSWORD=clave
 ORACLE_CONNECT_STRING=host:puerto/service_name
 ```
 
-> `.env` está en `.gitignore` — nunca se debe commitear con credenciales reales.
+> `.env.vr1`, `.env.vr2` y `.env.vr3` están en `.gitignore` — nunca se deben commitear con credenciales reales.
 
 ### 8. Paralelismo
 
@@ -128,6 +123,54 @@ workers: 3,  // número de peticiones simultáneas al API
 ```
 
 > Aumentar `workers` reduce el tiempo total de ejecución. Se recomienda no superar 5 en ambientes de prueba para no saturar el servidor.
+
+---
+
+## Múltiples servidores (Vía Rápida)
+
+El proyecto corre contra tres servidores, cada uno con su propia URL, credenciales Oracle y rango de letra de placa (para que las placas generadas en un servidor no choquen con las de otro):
+
+| Servidor      | `SERVIDOR` | URL base                     | Rango de placa | Credenciales      |
+|---------------|------------|-------------------------------|-----------------|--------------------|
+| Vía Rápida 1  | `vr1`      | `https://192.168.80.32:8760`  | A – F            | `.env.vr1`         |
+| Vía Rápida 2  | `vr2`      | `https://192.168.110.3:8760`  | G – L            | `.env.vr2`         |
+| Vía Rápida 3  | `vr3`      | `https://tstviarapida.co:8760`| M – Z            | `.env.vr3`         |
+
+Toda esta tabla vive en un solo lugar, `src/config/servidores.ts` — **no se edita nada más** al cambiar de servidor. `playwright.use.shared.ts` (URL base), `config.ts` (rango de placa) y `src/db/oracle.ts` (qué `.env` cargar) leen de ahí automáticamente según la variable de entorno `SERVIDOR`.
+
+### Cómo elegir el servidor
+
+Cada script `npm run test*` tiene una variante `:vr1` / `:vr2` / `:vr3` que fija `SERVIDOR` por vos (vía [`cross-env`](https://www.npmjs.com/package/cross-env), funciona igual en PowerShell, bash o CI):
+
+```bash
+npm run test:masivo:vr1       # runner de creación masiva contra Vía Rápida 1
+npm run test:masivo:vr2       # contra Vía Rápida 2
+npm run test:masivo:vr3       # contra Vía Rápida 3
+
+npm run test:vr1              # todos los casos de prueba (tests/) contra Vía Rápida 1
+npm run test:negativos:vr2    # solo casos-negativos contra Vía Rápida 2
+npm run test:positivos:vr3    # solo casos-positivos contra Vía Rápida 3
+```
+
+Si corrés un script **sin** sufijo (`npm test`, `npm run test:masivo`, etc.), se usa Vía Rápida 3 por defecto — es el servidor que ya estaba hardcodeado antes de esta mejora, así que nada de lo que ya tenías configurado cambia si no usás los sufijos nuevos.
+
+Para forzar el servidor manualmente en un comando que no tiene variante (ej. los scripts de diagnóstico `verificar-placa`/`verificar-contacto`/`verificar-epcs`, que también leen `SERVIDOR` porque importan de `src/db/oracle.ts`):
+
+```powershell
+# PowerShell
+$env:SERVIDOR = 'vr1'; npm run verificar-epcs
+```
+
+```bash
+# bash/CI
+SERVIDOR=vr1 npm run verificar-epcs
+```
+
+Al arrancar cualquier comando se imprime una línea `[SERVIDOR] ...` confirmando contra cuál servidor y con qué rango de placa se va a correr — conviene revisarla antes de lanzar una corrida masiva, para no terminar generando datos en el servidor equivocado.
+
+### Agregar un cuarto servidor
+
+Agregar una entrada nueva a `SERVIDORES` en `src/config/servidores.ts` (id, nombre, `baseURL`, `envFile`, `rangoLetraInicialPlaca`), crear su `.env.vr4.example` (siguiendo el patrón de los existentes) y, si querés un atajo npm, duplicar las líneas `:vr1` de `package.json` reemplazando `vr1` por el nuevo id. No hace falta tocar `playwright.use.shared.ts`, `config.ts` ni `src/db/oracle.ts` — todos leen de la tabla central.
 
 ---
 
@@ -150,7 +193,9 @@ npm run report            # de npm test (tests/)
 npm run report:masivo     # de npm run test:masivo (runner/)
 ```
 
-`npm run test:masivo` requiere `.env` con credenciales Oracle (los casos de `tests/` usan Oracle solo en `casos-positivos/`, ya que `casos-negativos/` y `validaciones/` no tocan la base de datos).
+Todos los comandos de arriba corren contra Vía Rápida 3 por defecto. Para apuntar a otro servidor, usar el sufijo `:vr1`/`:vr2`/`:vr3` (ej. `npm run test:masivo:vr1`) — ver [Múltiples servidores (Vía Rápida)](#múltiples-servidores-vía-rápida).
+
+`npm run test:masivo` requiere el `.env.vr*` del servidor elegido, con credenciales Oracle (los casos de `tests/` usan Oracle solo en `casos-positivos/`, ya que `casos-negativos/` y `validaciones/` no tocan la base de datos).
 
 ---
 
@@ -258,6 +303,8 @@ Para agregar un caso nuevo: añadir una entrada a `CASOS_NEGATIVOS` (o `CASOS_PO
 ├── reporters/
 │   └── resumen-reporter.ts     # Resumen agregado + tablas Markdown al finalizar
 ├── src/
+│   ├── config/
+│   │   └── servidores.ts       # Tabla única: URL/rango placa/.env por servidor (SERVIDOR)
 │   ├── utils/
 │   │   └── dian.ts             # Algoritmo dígito de verificación DIAN
 │   ├── data/

@@ -1,5 +1,15 @@
-import 'dotenv/config';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 import oracledb, { Pool } from 'oracledb';
+import { servidorActivo } from '../config/servidores';
+
+// Credenciales Oracle específicas del servidor activo (ver
+// src/config/servidores.ts → SERVIDOR). Se cargan PRIMERO para que tengan
+// prioridad; dotenv no sobreescribe variables ya presentes en process.env,
+// así que el .env genérico solo aporta lo que falte (compatibilidad con un
+// setup de un único servidor que no haya migrado a .env.vr1/.env.vr2/.env.vr3).
+dotenv.config({ path: path.resolve(__dirname, '..', '..', servidorActivo().envFile) });
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') });
 
 oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT;
 
@@ -10,7 +20,8 @@ async function getPool(): Promise<Pool> {
     const { ORACLE_USER, ORACLE_PASSWORD, ORACLE_CONNECT_STRING } = process.env;
     if (!ORACLE_USER || !ORACLE_PASSWORD || !ORACLE_CONNECT_STRING) {
       throw new Error(
-        'Faltan variables de entorno ORACLE_USER, ORACLE_PASSWORD o ORACLE_CONNECT_STRING (ver .env.example)'
+        `Faltan variables de entorno ORACLE_USER, ORACLE_PASSWORD o ORACLE_CONNECT_STRING ` +
+        `(ver ${servidorActivo().envFile}.example — servidor activo: ${servidorActivo().nombre})`
       );
     }
     pool = await oracledb.createPool({

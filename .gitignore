@@ -4,3 +4,6 @@ reports/
 playwright-report-runner/
 .cache/
 .env
+.env.vr1
+.env.vr2
+.env.vr3
