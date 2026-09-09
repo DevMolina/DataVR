@@ -24,7 +24,11 @@
     "report:masivo": "playwright show-report playwright-report-runner",
     "verificar-placa": "ts-node scripts/verificar-placa.ts",
     "verificar-contacto": "ts-node scripts/verificar-contacto.ts",
-    "verificar-epcs": "ts-node scripts/verificar-epcs.ts"
+    "verificar-epcs": "ts-node scripts/verificar-epcs.ts",
+    "agregar-vehiculo": "ts-node scripts/agregar-vehiculo.ts",
+    "agregar-vehiculo:vr1": "cross-env SERVIDOR=vr1 ts-node scripts/agregar-vehiculo.ts",
+    "agregar-vehiculo:vr2": "cross-env SERVIDOR=vr2 ts-node scripts/agregar-vehiculo.ts",
+    "agregar-vehiculo:vr3": "cross-env SERVIDOR=vr3 ts-node scripts/agregar-vehiculo.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",

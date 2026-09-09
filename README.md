@@ -1,9 +1,10 @@
 # Creación Masiva de Usuarios — Playwright
 
-Proyecto con dos partes independientes sobre el mismo endpoint (`POST /settings-users/api/v1/usersCl`):
+Proyecto con tres partes independientes:
 
-- **`runner/`** — herramienta de creación masiva de usuarios/vehículos de prueba (personas naturales y jurídicas colombianas, con dígito de verificación DIAN). No es una suite de validación: es un runner que consume el endpoint para poblar datos. Su comportamiento es estable y no cambia al agregar casos de prueba nuevos.
+- **`runner/`** — herramienta de creación masiva de usuarios/vehículos de prueba (`POST /settings-users/api/v1/usersCl`; personas naturales y jurídicas colombianas, con dígito de verificación DIAN). No es una suite de validación: es un runner que consume el endpoint para poblar datos. Su comportamiento es estable y no cambia al agregar casos de prueba nuevos.
 - **`tests/`** — casos de prueba reales del endpoint (formato, límites, positivos y negativos) que evalúan cómo responde el API ante distintos escenarios. Ver [Casos de prueba del endpoint](#casos-de-prueba-del-endpoint).
+- **`scripts/agregar-vehiculo.ts`** — agrega vehículos adicionales a un usuario **ya creado** (login + `POST vehicles-manager/api/v1/vehiclesCl/add`), un flujo distinto al de creación. Ver [Agregar vehículos a un usuario existente](#agregar-vehículos-a-un-usuario-existente).
 
 ---
 
@@ -273,6 +274,33 @@ Para agregar un caso nuevo: añadir una entrada a `CASOS_NEGATIVOS` (o `CASOS_PO
 
 ---
 
+## Agregar vehículos a un usuario existente
+
+`scripts/agregar-vehiculo.ts` es un flujo **distinto** al de creación masiva: en vez de crear un usuario nuevo, le agrega uno o más vehículos a un usuario que **ya existe** (creado por `runner/`, o por cualquier otro medio). Portado desde [`RunnerEnrolamiento`](https://github.com/DevMolina/RunnerEnrolamiento) y adaptado a este repo (usa el `APIRequestContext` de Playwright en vez de axios, para reutilizar el `baseURL`/headers cascadeados por servidor — ver [Múltiples servidores](#múltiples-servidores-vía-rápida) — en vez de tener su propia URL fija).
+
+### Qué hace, paso a paso
+
+1. Resuelve la **cuenta** (`ACCOUNT_ID`) del usuario contra Oracle: `TB_ACCOUNT.USER_CODE = <identificador>`. Si el usuario tiene más de una cuenta, toma la más antigua (`ACCOUNT_OPENNING_DATE` ascendente).
+2. Hace **login** como ese usuario (`POST settings-users/api/v1/users/login`) con su identificador y la contraseña fija de prueba (`CONFIG.PASSWORD`, la misma que usa `runner/` al crearlo). El token se extrae del **header** `authorization` de la respuesta (no del body) y se usa **tal cual** — el sistema real lo entrega como `"Bearer  eyJ..."` (con doble espacio) y al llamar al enrolamiento se antepone otro `"Bearer "`, reproduciendo el formato exacto `"Bearer Bearer  eyJ..."` que espera el backend. No es un bug de este script: es el comportamiento validado contra el sistema real, y no se debe "corregir".
+3. Por cada vehículo pedido: genera una placa única reutilizando `CONFIG.FORMATOS_PLACA`/`RANGO_LETRA_INICIAL_PLACA` (los mismos parámetros que usa `runner/`) y verificando contra `TAG` en Oracle; toma un EPC disponible (`obtenerEpcsDisponibles`, la misma consulta que ya usa el resto del proyecto) sin repetir EPC dentro de la misma corrida; asigna una categoría aleatoria entre 1 y 7.
+4. Llama a `POST vehicles-manager/api/v1/vehiclesCl/add` con `{ plate, category, account, epc }` para cada vehículo.
+
+Toda esta lógica vive separada del resto en `src/enrolamiento/` (`apiClient.ts` para login/enrolamiento, `agregarVehiculo.ts` para la orquestación) — no se mezcla con `src/generators/` ni `src/testing/`, que son del flujo de creación masiva.
+
+### Uso
+
+```bash
+npm run agregar-vehiculo -- --user 1049625159              # 1 vehículo, contra el servidor por defecto (vr3)
+npm run agregar-vehiculo -- --user 1049625159 --count 3     # 3 vehículos en la misma corrida
+npm run agregar-vehiculo:vr1 -- --user 1049625159            # fija el servidor (igual que el resto de scripts)
+```
+
+Requiere el `.env.vrN` del servidor activo con credenciales Oracle (se usa para resolver la cuenta, validar unicidad de placa y traer EPCs — ver [Múltiples servidores](#múltiples-servidores-vía-rápida)).
+
+Genera `reports/enrolamiento-vehiculos_<fecha>_<hora>.md` con el detalle de cada intento (placa, EPC, categoría, cuenta, HTTP, resultado). Termina con código de salida distinto de cero si algún vehículo falló, para que sea fácil detectarlo en CI/scripts.
+
+---
+
 ## Datos generados
 
 | Campo        | Persona Natural (CC)              | Persona Jurídica (NIT)               |
@@ -299,7 +327,8 @@ Para agregar un caso nuevo: añadir una entrada a `CASOS_NEGATIVOS` (o `CASOS_PO
 ├── scripts/
 │   ├── verificar-placa.ts      # Diagnóstico manual: placa en TAG
 │   ├── verificar-contacto.ts   # Diagnóstico manual: identificador/email en CONTACTS
-│   └── verificar-epcs.ts       # Diagnóstico manual: EPCs disponibles en Oracle
+│   ├── verificar-epcs.ts       # Diagnóstico manual: EPCs disponibles en Oracle
+│   └── agregar-vehiculo.ts     # CLI: agrega vehículos a un usuario ya creado (npm run agregar-vehiculo)
 ├── reporters/
 │   └── resumen-reporter.ts     # Resumen agregado + tablas Markdown al finalizar
 ├── src/
@@ -310,7 +339,7 @@ Para agregar un caso nuevo: añadir una entrada a `CASOS_NEGATIVOS` (o `CASOS_PO
 │   ├── data/
 │   │   └── locations.ts        # Catálogo departamentos/municipios Colombia
 │   ├── db/
-│   │   └── oracle.ts           # Unicidad (TAG, CONTACTS) + EPCs disponibles, todo contra Oracle
+│   │   └── oracle.ts           # Unicidad (TAG, CONTACTS) + cuenta (TB_ACCOUNT) + EPCs, todo contra Oracle
 │   ├── validators/
 │   │   ├── identificador.ts    # Validación de FORMATO: cédula, NIT+DV
 │   │   └── email.ts            # Validación de FORMATO: email
@@ -319,6 +348,9 @@ Para agregar un caso nuevo: añadir una entrada a `CASOS_NEGATIVOS` (o `CASOS_PO
 │   │   ├── registroHelpers.ts  # Unicidad Oracle + validación de formato (runner y casos-positivos)
 │   │   ├── mutaciones.ts       # Catálogo de casos negativos/positivos con su línea base HTTP
 │   │   └── epcCache.ts         # Caché en disco de EPCs (puente entre Oracle async y carga síncrona de specs)
+│   ├── enrolamiento/
+│   │   ├── apiClient.ts        # Login + POST vehicles-manager/add (flujo separado del de creación)
+│   │   └── agregarVehiculo.ts  # Orquestación: cuenta → login → placa/EPC → enrolar, por cada vehículo
 │   └── generators/
 │       └── userGenerator.ts    # Generación de personas y vehículos
 ├── runner/
