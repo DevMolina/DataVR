@@ -135,7 +135,7 @@ export async function obtenerCuentaPorIdentificador(identifier: string): Promise
       `SELECT a.ACCOUNT_ID
          FROM TB_ACCOUNT a
         WHERE a.USER_CODE = :user
-        ORDER BY a.ACCOUNT_OPENNING_DATE ASC`,
+        ORDER BY a.ACCOUNT_OPENING_DATE ASC`,
       { user: identifier },
       { maxRows: 1 }
     );
