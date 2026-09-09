@@ -126,7 +126,12 @@ export async function obtenerEpcsDisponibles(): Promise<string[]> {
 // Resuelve la cuenta (ACCOUNT_ID) asociada a un usuario ya creado, para
 // poder enrolarle vehículos adicionales (ver src/enrolamiento/). Un usuario
 // puede tener más de una cuenta; por defecto se toma la más antigua
-// (ACCOUNT_OPENNING_DATE ascendente).
+// (ACCOUNT_OPENING_DATE ascendente).
+//
+// El bind se llama ":userCode" (no ":user") porque USER es palabra
+// reservada/pseudocolumna en Oracle (devuelve el usuario de la sesión); usar
+// ":user" como nombre de bind variable revienta con ORA-01745
+// (invalid host/bind variable name).
 export async function obtenerCuentaPorIdentificador(identifier: string): Promise<string | null> {
   const p = await getPool();
   const connection = await p.getConnection();
@@ -134,9 +139,9 @@ export async function obtenerCuentaPorIdentificador(identifier: string): Promise
     const result = await connection.execute<{ ACCOUNT_ID: string }>(
       `SELECT a.ACCOUNT_ID
          FROM TB_ACCOUNT a
-        WHERE a.USER_CODE = :user
+        WHERE a.USER_CODE = :userCode
         ORDER BY a.ACCOUNT_OPENING_DATE ASC`,
-      { user: identifier },
+      { userCode: identifier },
       { maxRows: 1 }
     );
     return result.rows?.[0]?.ACCOUNT_ID ?? null;
