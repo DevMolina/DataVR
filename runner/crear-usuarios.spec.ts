@@ -30,10 +30,14 @@ for (const [index, registro] of registros.entries()) {
     await asegurarPlacaUnica(registro, attach);
     await asegurarContactoUnico(registro, attach);
 
-    const requestBody = JSON.stringify(registro, null, 2);
+    // Los datos de ubicación se envían vacíos en este runner. Se sobreescriben
+    // aquí (y no en el generador) porque tests/ usa el mismo generador como
+    // base válida para sus mutaciones.
+    const payload = { ...registro, address: '', country: '', department: '', locationId: '' };
+    const requestBody = JSON.stringify(payload, null, 2);
 
     const response = await request.post('/settings-users/api/v1/usersCl', {
-      data: registro,
+      data: payload,
     });
 
     const responseBody = await response.json().catch(() => ({}));
@@ -63,8 +67,8 @@ for (const [index, registro] of registros.entries()) {
         representante: registro.legalRepresentativeName ?? '',
         email: registro.email,
         telefono: registro.phone,
-        departamento: registro.department,
-        municipio: registro.locationId,
+        departamento: payload.department,
+        municipio: payload.locationId,
         placa: registro.plate,
         categoria: registro.category,
         epc: registro.epc,
